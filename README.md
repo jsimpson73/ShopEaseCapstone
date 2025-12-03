@@ -1,0 +1,2 @@
+# ShopEaseCapstone
+ShopEase Capstone project

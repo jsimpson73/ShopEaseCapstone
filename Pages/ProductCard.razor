@@ -1,0 +1,54 @@
+@using ShopEase.Models
+@using ShopEase.Services
+
+<div class="product-card">
+    <div class="product-image-container">
+        <img src="@Product.ImageUrl" alt="@Product.Name" class="product-image" />
+        @if (Product.StockQuantity <= 5)
+        {
+            <span class="stock-badge">Only @Product.StockQuantity left!</span>
+        }
+    </div>
+    
+    <div class="product-details">
+        <h3 class="product-name">@Product.Name</h3>
+        <p class="product-category">@Product.Category</p>
+        <p class="product-description">@Product.Description</p>
+        
+        <div class="product-footer">
+            <span class="product-price">$@Product.Price.ToString("F2")</span>
+            
+            @if (Product.StockQuantity > 0)
+            {
+                <button class="btn-add-to-cart" @onclick="HandleAddToCart" aria-label="Add @Product.Name to cart">
+                    Add to Cart
+                </button>
+            }
+            else
+            {
+                <button class="btn-out-of-stock" disabled aria-label="@Product.Name is out of stock">
+                    Out of Stock
+                </button>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Product Product { get; set; } = new Product();
+
+    [Parameter]
+    public EventCallback<Product> OnAddToCart { get; set; }
+
+    /// <summary>
+    /// Handles the Add to Cart button click event
+    /// </summary>
+    private async Task HandleAddToCart()
+    {
+        if (Product != null && Product.IsValid())
+        {
+            await OnAddToCart.InvokeAsync(Product);
+        }
+    }
+}

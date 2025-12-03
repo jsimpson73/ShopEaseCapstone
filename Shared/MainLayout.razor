@@ -1,0 +1,92 @@
+@inherits LayoutComponentBase
+@using ShopEase.Services
+@inject ICartService CartService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+
+<div class="page">
+    <header class="header">
+        <div class="header-container">
+            <div class="logo" @onclick="@(() => Navigation.NavigateTo("/"))">
+                <h1>ShopEase</h1>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/cart" class="nav-link">
+                    Cart
+                    @if (cartItemCount > 0)
+                    {
+                        <span class="cart-badge">@cartItemCount</span>
+                    }
+                </a>
+                
+                <AuthorizeView>
+                    <Authorized>
+                        <span class="nav-link user-info">Hello, @context.User.Identity?.Name</span>
+                        <button class="nav-link btn-logout" @onclick="Logout">Logout</button>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="/login" class="nav-link">Login</a>
+                        <a href="/register" class="nav-link">Register</a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main-content">
+        @Body
+    </main>
+
+    <footer class="footer">
+        <div class="footer-container">
+            <p>&copy; 2024 ShopEase. All rights reserved.</p>
+            <p>Built with Blazor WebAssembly & C#</p>
+        </div>
+    </footer>
+</div>
+
+@code {
+    private int cartItemCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateCartCount();
+        CartService.OnCartChanged += OnCartChanged;
+    }
+
+    /// <summary>
+    /// Updates the cart item count
+    /// </summary>
+    private async Task UpdateCartCount()
+    {
+        cartItemCount = await CartService.GetCartItemCount();
+    }
+
+    /// <summary>
+    /// Handles cart change events
+    /// </summary>
+    private async void OnCartChanged()
+    {
+        await UpdateCartCount();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Handles user logout
+    /// </summary>
+    private async Task Logout()
+    {
+        if (AuthStateProvider is CustomAuthStateProvider customAuthProvider)
+        {
+            await customAuthProvider.MarkUserAsLoggedOut();
+            Navigation.NavigateTo("/", true);
+        }
+    }
+
+    public void Dispose()
+    {
+        CartService.OnCartChanged -= OnCartChanged;
+    }
+}

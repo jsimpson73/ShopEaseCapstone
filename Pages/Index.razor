@@ -1,0 +1,133 @@
+@page "/"
+@using ShopEase.Models
+@using ShopEase.Services
+@inject IProductService ProductService
+@inject ICartService CartService
+@inject NavigationManager Navigation
+
+<PageTitle>ShopEase - Home</PageTitle>
+
+<div class="home-container">
+    <section class="hero-section">
+        <h1>Welcome to ShopEase</h1>
+        <p>Your one-stop shop for quality products at great prices</p>
+    </section>
+
+    <section class="filter-section">
+        <label for="category-filter">Filter by Category:</label>
+        <select id="category-filter" @onchange="OnCategoryChanged" class="category-filter">
+            @foreach (var category in categories)
+            {
+                <option value="@category">@category</option>
+            }
+        </select>
+    </section>
+
+    <section class="products-section">
+        @if (isLoading)
+        {
+            <div class="loading-spinner">
+                <p>Loading products...</p>
+            </div>
+        }
+        else if (filteredProducts.Count == 0)
+        {
+            <div class="no-products">
+                <p>No products found in this category.</p>
+            </div>
+        }
+        else
+        {
+            <div class="products-grid">
+                @foreach (var product in filteredProducts)
+                {
+                    <ProductCard Product="@product" OnAddToCart="@AddToCart" />
+                }
+            </div>
+        }
+    </section>
+
+    @if (showNotification)
+    {
+        <div class="notification @notificationClass">
+            @notificationMessage
+        </div>
+    }
+</div>
+
+@code {
+    private List<Product> allProducts = new();
+    private List<Product> filteredProducts = new();
+    private List<string> categories = new();
+    private string selectedCategory = "All";
+    private bool isLoading = true;
+    private bool showNotification = false;
+    private string notificationMessage = "";
+    private string notificationClass = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+        await LoadCategories();
+    }
+
+    /// <summary>
+    /// Loads all products from the service
+    /// </summary>
+    private async Task LoadProducts()
+    {
+        isLoading = true;
+        allProducts = await ProductService.GetAllProducts();
+        filteredProducts = allProducts;
+        isLoading = false;
+    }
+
+    /// <summary>
+    /// Loads available categories
+    /// </summary>
+    private async Task LoadCategories()
+    {
+        categories = await ProductService.GetCategories();
+    }
+
+    /// <summary>
+    /// Handles category filter change
+    /// </summary>
+    private async Task OnCategoryChanged(ChangeEventArgs e)
+    {
+        selectedCategory = e.Value?.ToString() ?? "All";
+        filteredProducts = await ProductService.GetProductsByCategory(selectedCategory);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Adds a product to the cart
+    /// </summary>
+    private async Task AddToCart(Product product)
+    {
+        try
+        {
+            await CartService.AddToCart(product);
+            ShowNotification($"{product.Name} added to cart!", "success");
+        }
+        catch (Exception ex)
+        {
+            ShowNotification($"Error adding product to cart: {ex.Message}", "error");
+        }
+    }
+
+    /// <summary>
+    /// Shows a temporary notification
+    /// </summary>
+    private async void ShowNotification(string message, string type)
+    {
+        notificationMessage = message;
+        notificationClass = type;
+        showNotification = true;
+        StateHasChanged();
+
+        await Task.Delay(3000);
+        showNotification = false;
+        StateHasChanged();
+    }
+}

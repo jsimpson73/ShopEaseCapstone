@@ -1,0 +1,243 @@
+@page "/cart"
+@using ShopEase.Models
+@using ShopEase.Services
+@inject ICartService CartService
+@inject NavigationManager Navigation
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<PageTitle>Shopping Cart - ShopEase</PageTitle>
+
+<div class="cart-container">
+    <h1>Shopping Cart</h1>
+
+    @if (isLoading)
+    {
+        <div class="loading-spinner">
+            <p>Loading cart...</p>
+        </div>
+    }
+    else if (cartItems.Count == 0)
+    {
+        <div class="empty-cart">
+            <p>Your cart is empty.</p>
+            <button class="btn-primary" @onclick="GoToHome">Continue Shopping</button>
+        </div>
+    }
+    else
+    {
+        <div class="cart-content">
+            <div class="cart-items">
+                @foreach (var item in cartItems)
+                {
+                    <div class="cart-item">
+                        <img src="@item.Product.ImageUrl" alt="@item.Product.Name" class="cart-item-image" />
+                        
+                        <div class="cart-item-details">
+                            <h3>@item.Product.Name</h3>
+                            <p class="cart-item-category">@item.Product.Category</p>
+                            <p class="cart-item-price">$@item.Product.Price.ToString("F2")</p>
+                        </div>
+
+                        <div class="cart-item-quantity">
+                            <label for="quantity-@item.Product.ProductID">Quantity:</label>
+                            <input 
+                                type="number" 
+                                id="quantity-@item.Product.ProductID"
+                                min="1" 
+                                max="@item.Product.StockQuantity" 
+                                value="@item.Quantity" 
+                                @onchange="@(e => UpdateQuantity(item.Product.ProductID, int.Parse(e.Value?.ToString() ?? "1")))"
+                                class="quantity-input"
+                                aria-label="Quantity for @item.Product.Name" />
+                        </div>
+
+                        <div class="cart-item-subtotal">
+                            <p>Subtotal: $@item.GetSubtotal().ToString("F2")</p>
+                        </div>
+
+                        <button 
+                            class="btn-remove" 
+                            @onclick="@(() => RemoveItem(item.Product.ProductID))"
+                            aria-label="Remove @item.Product.Name from cart">
+                            Remove
+                        </button>
+                    </div>
+                }
+            </div>
+
+            <div class="cart-summary">
+                <h2>Order Summary</h2>
+                <div class="summary-row">
+                    <span>Items:</span>
+                    <span>@totalItems</span>
+                </div>
+                <div class="summary-row">
+                    <span>Subtotal:</span>
+                    <span>$@cartTotal.ToString("F2")</span>
+                </div>
+                <div class="summary-row">
+                    <span>Tax (10%):</span>
+                    <span>$@tax.ToString("F2")</span>
+                </div>
+                <div class="summary-row total">
+                    <span>Total:</span>
+                    <span>$@grandTotal.ToString("F2")</span>
+                </div>
+
+                <button class="btn-checkout" @onclick="Checkout">
+                    Proceed to Checkout
+                </button>
+                <button class="btn-secondary" @onclick="GoToHome">
+                    Continue Shopping
+                </button>
+                <button class="btn-clear" @onclick="ClearCart">
+                    Clear Cart
+                </button>
+            </div>
+        </div>
+    }
+
+    @if (showNotification)
+    {
+        <div class="notification @notificationClass">
+            @notificationMessage
+        </div>
+    }
+</div>
+
+@code {
+    private List<CartItem> cartItems = new();
+    private bool isLoading = true;
+    private decimal cartTotal = 0;
+    private decimal tax = 0;
+    private decimal grandTotal = 0;
+    private int totalItems = 0;
+    private bool showNotification = false;
+    private string notificationMessage = "";
+    private string notificationClass = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCart();
+        CartService.OnCartChanged += OnCartChanged;
+    }
+
+    /// <summary>
+    /// Loads cart items and calculates totals
+    /// </summary>
+    private async Task LoadCart()
+    {
+        isLoading = true;
+        var cart = await CartService.GetCart();
+        cartItems = cart.GetItems();
+        CalculateTotals();
+        isLoading = false;
+    }
+
+    /// <summary>
+    /// Calculates cart totals
+    /// </summary>
+    private void CalculateTotals()
+    {
+        cartTotal = cartItems.Sum(item => item.GetSubtotal());
+        tax = cartTotal * 0.10m;
+        grandTotal = cartTotal + tax;
+        totalItems = cartItems.Sum(item => item.Quantity);
+    }
+
+    /// <summary>
+    /// Updates the quantity of an item
+    /// </summary>
+    private async Task UpdateQuantity(int productId, int quantity)
+    {
+        try
+        {
+            await CartService.UpdateQuantity(productId, quantity);
+            await LoadCart();
+            ShowNotification("Quantity updated", "success");
+        }
+        catch (Exception ex)
+        {
+            ShowNotification($"Error updating quantity: {ex.Message}", "error");
+        }
+    }
+
+    /// <summary>
+    /// Removes an item from the cart
+    /// </summary>
+    private async Task RemoveItem(int productId)
+    {
+        try
+        {
+            await CartService.RemoveFromCart(productId);
+            await LoadCart();
+            ShowNotification("Item removed from cart", "success");
+        }
+        catch (Exception ex)
+        {
+            ShowNotification($"Error removing item: {ex.Message}", "error");
+        }
+    }
+
+    /// <summary>
+    /// Clears all items from the cart
+    /// </summary>
+    private async Task ClearCart()
+    {
+        try
+        {
+            await CartService.ClearCart();
+            await LoadCart();
+            ShowNotification("Cart cleared", "success");
+        }
+        catch (Exception ex)
+        {
+            ShowNotification($"Error clearing cart: {ex.Message}", "error");
+        }
+    }
+
+    /// <summary>
+    /// Handles checkout process
+    /// </summary>
+    private void Checkout()
+    {
+        ShowNotification("Checkout functionality coming soon!", "info");
+    }
+
+    /// <summary>
+    /// Navigates to home page
+    /// </summary>
+    private void GoToHome()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    /// <summary>
+    /// Handles cart change events
+    /// </summary>
+    private async void OnCartChanged()
+    {
+        await LoadCart();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Shows a temporary notification
+    /// </summary>
+    private async void ShowNotification(string message, string type)
+    {
+        notificationMessage = message;
+        notificationClass = type;
+        showNotification = true;
+        StateHasChanged();
+
+        await Task.Delay(3000);
+        showNotification = false;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        CartService.OnCartChanged -= OnCartChanged;
+    }
+}
